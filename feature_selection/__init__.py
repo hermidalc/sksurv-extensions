@@ -9,6 +9,6 @@ from ._univariate_selection import CoxPHSurvivalScorer, FastSurvivalSVMScorer
 
 
 __all__ = ['CachedCoxPHSurvivalScorer',
-           'CachedFastSurvivalSVMScorer'
+           'CachedFastSurvivalSVMScorer',
            'CoxPHSurvivalScorer',
            'FastSurvivalSVMScorer']
