@@ -83,7 +83,7 @@ class FastSurvivalSVMScorer(BaseSurvivalScorer):
         rank_ratio = 0, only regression is performed. A non-zero value is only
         allowed if optimizer is one of "avltree", "rbtree", or "direct-count".
 
-    n_iter : int (default = 20)
+    max_iter : int (default = 20)
         Maximum number of iterations to perform in Newton optimization.
 
     optimizer : string (default = "avltree")
