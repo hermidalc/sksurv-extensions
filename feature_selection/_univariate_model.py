@@ -5,10 +5,11 @@ import numpy as np
 from sklearn.base import BaseEstimator, clone, MetaEstimatorMixin
 from sklearn.utils import check_X_y
 from sklearn.utils.metaestimators import if_delegate_has_method
-from sksurv.linear_model import CoxPHSurvivalAnalysis, CoxnetSurvivalAnalysis
+from sksurv.linear_model import CoxPHSurvivalAnalysis
 
 from sklearn_extensions.feature_selection._base import ExtendedSelectorMixin
 from sklearn_extensions.utils.validation import check_is_fitted
+from ..linear_model import FastCoxPHSurvivalAnalysis
 
 
 class SelectFromUnivariateModel(ExtendedSelectorMixin, MetaEstimatorMixin,
@@ -75,19 +76,17 @@ class SelectFromUnivariateModel(ExtendedSelectorMixin, MetaEstimatorMixin,
         """
         X, y = check_X_y(X, y)
         self._check_params(X, y, feature_meta)
+        penalty_factor = None
+        penalized_feature_idxs = range(X.shape[1])
         if self.penalty_factor_meta_col is not None:
             penalty_factor = (feature_meta[self.penalty_factor_meta_col]
                               .to_numpy())
             penalized_feature_idxs = np.where(penalty_factor != 0)[0]
             unpenalized_feature_idxs = np.where(penalty_factor == 0)[0]
-        else:
-            penalty_factor = None
-            penalized_feature_idxs = range(X.shape[1])
         estimator = clone(self.estimator)
-        if isinstance(estimator, CoxPHSurvivalAnalysis):
+        if isinstance(estimator, (CoxPHSurvivalAnalysis,
+                                  FastCoxPHSurvivalAnalysis)):
             estimator.set_params(alpha=0)
-        elif isinstance(estimator, CoxnetSurvivalAnalysis):
-            estimator.set_params(alphas=[0])
         scores = np.zeros(X.shape[1])
         for j in penalized_feature_idxs:
             feature_idxs = [j]
@@ -98,7 +97,7 @@ class SelectFromUnivariateModel(ExtendedSelectorMixin, MetaEstimatorMixin,
             scores[j] = estimator.fit(Xj, y, **fit_params).score(Xj, y)
         self.scores_ = scores
         self.estimator_ = clone(self.estimator)
-        if (isinstance(estimator, CoxnetSurvivalAnalysis)
+        if (isinstance(estimator, FastCoxPHSurvivalAnalysis)
                 and penalty_factor is not None):
             self.estimator_.set_params(
                 penalty_factor=penalty_factor[self._get_support_mask()])
