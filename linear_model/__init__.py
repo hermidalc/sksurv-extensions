@@ -1,5 +1,5 @@
 from ._cached import CachedCoxPHSurvivalAnalysis
-from ._coxph import FastCoxPHSurvivalAnalysis
+from ._coxnet import FastCoxPHSurvivalAnalysis
 
 __all__ = ['CachedCoxPHSurvivalAnalysis',
            'FastCoxPHSurvivalAnalysis']

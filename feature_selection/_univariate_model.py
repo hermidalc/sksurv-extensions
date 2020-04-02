@@ -15,7 +15,8 @@ from ..linear_model import FastCoxPHSurvivalAnalysis
 class SelectFromUnivariateModel(ExtendedSelectorMixin, MetaEstimatorMixin,
                                 BaseEstimator):
     """Select features according to scores calculated from model fitting on
-    each individual feaure.
+    each individual feature, including adjusting for any passed prognostic
+    clinical or molecular features.
 
     Parameters
     ----------
@@ -26,10 +27,6 @@ class SelectFromUnivariateModel(ExtendedSelectorMixin, MetaEstimatorMixin,
         Number of top features to select.
         The "all" option bypasses selection, for use in a parameter search.
 
-    penalty_factor_meta_col : str (default=None)
-        Feature metadata column name to use for CoxnetSurvivalAnalysis
-        penalty_factor.
-
     Attributes
     ----------
     estimator_ : an estimator
@@ -39,10 +36,9 @@ class SelectFromUnivariateModel(ExtendedSelectorMixin, MetaEstimatorMixin,
         Feature scores.
     """
 
-    def __init__(self, estimator, k=10, penalty_factor_meta_col=None):
+    def __init__(self, estimator, k=10):
         self.estimator = estimator
         self.k = k
-        self.penalty_factor_meta_col = penalty_factor_meta_col
 
     @property
     def _estimator_type(self):
@@ -53,15 +49,22 @@ class SelectFromUnivariateModel(ExtendedSelectorMixin, MetaEstimatorMixin,
         return self.estimator_.classes_
 
     def fit(self, X, y, feature_meta=None, **fit_params):
-        """Use model to fit each feature individually and calculate scores.
+        """Fits an unpenalized model on each feature individually (including
+        and adjusting for prognostic clinical or molecular features that are
+        passed) and calculate their scores. Then selects the ``k`` best scoring
+        features and fits a final penalized model on these features (including
+        and adjusting for unpenalized prognostic clinical or molecular features
+        that are passed).
 
         Parameters
         ----------
         X : array-like, shape = (n_samples, n_features)
-            The training input samples.
+            The training input data matrix.
 
-        y : array-like, shape = (n_samples,)
-            The target values.
+        y : structured array, shape = (n_samples,)
+            A structured array containing the binary event indicator as the
+            first field, and time of event or time of censoring as the second
+            field.
 
         feature_meta : pandas.DataFrame, pandas.Series (default = None), \
             shape = (n_features, n_metadata)
@@ -76,21 +79,27 @@ class SelectFromUnivariateModel(ExtendedSelectorMixin, MetaEstimatorMixin,
         """
         X, y = check_X_y(X, y)
         self._check_params(X, y, feature_meta)
-        penalty_factor = None
         penalized_feature_idxs = range(X.shape[1])
-        if self.penalty_factor_meta_col is not None:
-            penalty_factor = (feature_meta[self.penalty_factor_meta_col]
-                              .to_numpy())
-            penalized_feature_idxs = np.where(penalty_factor != 0)[0]
-            unpenalized_feature_idxs = np.where(penalty_factor == 0)[0]
+        unpenalized_feature_idxs = np.array([])
         estimator = clone(self.estimator)
+        if isinstance(estimator, FastCoxPHSurvivalAnalysis):
+            penalty_factor = (
+                feature_meta[estimator.penalty_factor_meta_col].to_numpy()
+                if estimator.penalty_factor_meta_col is not None else
+                estimator.penalty_factor
+                if estimator.penalty_factor is not None else None)
+            if penalty_factor is not None:
+                penalized_feature_idxs = np.where(penalty_factor != 0)[0]
+                unpenalized_feature_idxs = np.where(penalty_factor == 0)[0]
         if isinstance(estimator, (CoxPHSurvivalAnalysis,
                                   FastCoxPHSurvivalAnalysis)):
             estimator.set_params(alpha=0)
+            if isinstance(estimator, FastCoxPHSurvivalAnalysis):
+                estimator.set_params(penalty_factor=None)
         scores = np.zeros(X.shape[1])
         for j in penalized_feature_idxs:
             feature_idxs = [j]
-            if penalty_factor is not None:
+            if unpenalized_feature_idxs.size > 0:
                 feature_idxs = np.concatenate(
                     (feature_idxs, unpenalized_feature_idxs))
             Xj = X[:, feature_idxs]
@@ -214,20 +223,21 @@ class SelectFromUnivariateModel(ExtendedSelectorMixin, MetaEstimatorMixin,
             raise ValueError("k should be >=0, <= n_features = %d; got %r. "
                              "Use k='all' to return all features."
                              % (X.shape[1], self.k))
-        if self.penalty_factor_meta_col is not None:
+        if (isinstance(self.estimator, FastCoxPHSurvivalAnalysis)
+                and self.estimator.penalty_factor_meta_col is not None):
             if feature_meta is None:
                 raise ValueError('penalty_factor_meta_col specified but '
                                  'feature_meta not passed.')
-            if self.penalty_factor_meta_col not in feature_meta.columns:
+            if (self.estimator.penalty_factor_meta_col not in
+                    feature_meta.columns):
                 raise ValueError('%s feature_meta column does not exist.'
-                                 % self.penalty_factor_meta_col)
+                                 % self.estimator.penalty_factor_meta_col)
 
     def _get_support_mask(self):
         check_is_fitted(self)
         if self.k == 'all':
             return np.ones_like(self.scores_, dtype=bool)
-        if self.k == 0:
-            return np.zeros_like(self.scores_, dtype=bool)
         mask = np.zeros_like(self.scores_, dtype=bool)
-        mask[np.argsort(self.scores_, kind='mergesort')[-self.k:]] = True
+        if self.k > 0:
+            mask[np.argsort(self.scores_, kind='mergesort')[-self.k:]] = True
         return mask
