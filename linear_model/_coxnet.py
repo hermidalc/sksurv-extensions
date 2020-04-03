@@ -141,7 +141,7 @@ class ExtendedCoxnetSurvivalAnalysis(CoxnetSurvivalAnalysis):
                                  % self.penalty_factor_meta_col)
 
 
-class FastCoxPHSurvivalAnalysis(CoxnetSurvivalAnalysis):
+class FastCoxPHSurvivalAnalysis(ExtendedCoxnetSurvivalAnalysis):
     """Fast Cox proportional hazards model using Coxnet with settings to
     reproduce standard Cox L2 ridge regression objective function and support
     for setting feature penalty_factor in a Pipeline context.
@@ -224,10 +224,10 @@ class FastCoxPHSurvivalAnalysis(CoxnetSurvivalAnalysis):
                  fit_baseline_model=False):
         super().__init__(
             l1_ratio=l1_ratio, penalty_factor=penalty_factor,
+            penalty_factor_meta_col=penalty_factor_meta_col,
             normalize=normalize, copy_X=copy_X, tol=tol, max_iter=max_iter,
             verbose=verbose, fit_baseline_model=fit_baseline_model)
         self.alpha = alpha
-        self.penalty_factor_meta_col = penalty_factor_meta_col
 
     def fit(self, X, y, feature_meta=None):
         """Fits the estimator.
@@ -250,19 +250,5 @@ class FastCoxPHSurvivalAnalysis(CoxnetSurvivalAnalysis):
         -------
         self : object
         """
-        X, y = check_X_y(X, y)
-        self._check_params(X, y, feature_meta)
         self.alphas = [self.alpha / X.shape[0]]
-        if self.penalty_factor_meta_col is not None:
-            self.penalty_factor = (feature_meta[self.penalty_factor_meta_col]
-                                   .to_numpy())
-        super().fit(X, y)
-
-    def _check_params(self, X, y, feature_meta):
-        if self.penalty_factor_meta_col is not None:
-            if feature_meta is None:
-                raise ValueError('penalty_factor_meta_col specified but '
-                                 'feature_meta not passed.')
-            if self.penalty_factor_meta_col not in feature_meta.columns:
-                raise ValueError('%s feature_meta column does not exist.'
-                                 % self.penalty_factor_meta_col)
+        super().fit(X, y, feature_meta)
