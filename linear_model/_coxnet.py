@@ -125,13 +125,40 @@ class ExtendedCoxnetSurvivalAnalysis(CoxnetSurvivalAnalysis):
         self : object
         """
         X, y = check_X_y(X, y)
-        self._check_params(X, y, feature_meta)
+        self.__check_params(X, y, feature_meta)
         if self.penalty_factor_meta_col is not None:
             self.penalty_factor = (feature_meta[self.penalty_factor_meta_col]
                                    .to_numpy())
-        super().fit(X, y)
+        return super().fit(X, y)
 
-    def _check_params(self, X, y, feature_meta):
+    def predict(self, X, alpha=None, feature_meta=None):
+        """The linear predictor of the model.
+
+        Parameters
+        ----------
+        X : array-like, shape = (n_samples, n_features)
+            Test data of which to calculate log-likelihood from
+
+        alpha : float (default=None)
+            Constant that multiplies the penalty terms. If the same alpha was
+            used during training, exact coefficients are used, otherwise
+            coefficients are interpolated from the closest alpha values that
+            were used during training. If set to ``None``, the last alpha in
+            the solution path is used.
+
+        feature_meta : pandas.DataFrame, pandas.Series (default = None), \
+            shape = (n_features, n_metadata)
+            Feature metadata.
+
+        Returns
+        -------
+        T : array, shape = (n_samples,)
+            The predicted decision function
+        """
+        return super().predict(X, alpha)
+
+    # double underscore to not override parent
+    def __check_params(self, X, y, feature_meta):
         if self.penalty_factor_meta_col is not None:
             if feature_meta is None:
                 raise ValueError('penalty_factor_meta_col specified but '
@@ -218,9 +245,9 @@ class FastCoxPHSurvivalAnalysis(ExtendedCoxnetSurvivalAnalysis):
            Journal of statistical software. 2011 Mar;39(5):1.
     """
 
-    def __init__(self, alpha=0, l1_ratio=1e-30, penalty_factor=None,
+    def __init__(self, alpha=0, l1_ratio=1e-40, penalty_factor=None,
                  penalty_factor_meta_col=None, normalize=False, copy_X=True,
-                 tol=1e-15, max_iter=1000000, verbose=False,
+                 tol=1e-16, max_iter=1000000, verbose=False,
                  fit_baseline_model=False):
         super().__init__(
             l1_ratio=l1_ratio, penalty_factor=penalty_factor,
@@ -251,4 +278,4 @@ class FastCoxPHSurvivalAnalysis(ExtendedCoxnetSurvivalAnalysis):
         self : object
         """
         self.alphas = [self.alpha / X.shape[0]]
-        super().fit(X, y, feature_meta)
+        return super().fit(X, y, feature_meta)

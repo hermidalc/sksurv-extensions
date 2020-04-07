@@ -39,6 +39,7 @@ class SelectFromUnivariateModel(ExtendedSelectorMixin, MetaEstimatorMixin,
     def __init__(self, estimator, k=10):
         self.estimator = estimator
         self.k = k
+        self._penalized_k = k
 
     @property
     def _estimator_type(self):
@@ -79,42 +80,51 @@ class SelectFromUnivariateModel(ExtendedSelectorMixin, MetaEstimatorMixin,
         """
         X, y = check_X_y(X, y)
         self._check_params(X, y, feature_meta)
-        penalized_feature_idxs = range(X.shape[1])
-        unpenalized_feature_idxs = np.array([])
+        feature_idxs = range(X.shape[1])
+        feature_idx_groups = [[j] for j in feature_idxs]
         estimator = clone(self.estimator)
-        if isinstance(estimator, FastCoxPHSurvivalAnalysis):
+        if isinstance(estimator, CoxPHSurvivalAnalysis):
+            # for optimization numerical stability
+            estimator.set_params(alpha=1e-5)
+        elif isinstance(estimator, FastCoxPHSurvivalAnalysis):
             penalty_factor = (
                 feature_meta[estimator.penalty_factor_meta_col].to_numpy()
                 if estimator.penalty_factor_meta_col is not None else
                 estimator.penalty_factor
                 if estimator.penalty_factor is not None else None)
             if penalty_factor is not None:
-                penalized_feature_idxs = np.where(penalty_factor != 0)[0]
-                unpenalized_feature_idxs = np.where(penalty_factor == 0)[0]
-        if isinstance(estimator, (CoxPHSurvivalAnalysis,
-                                  FastCoxPHSurvivalAnalysis)):
-            estimator.set_params(alpha=0)
-            if isinstance(estimator, FastCoxPHSurvivalAnalysis):
-                estimator.set_params(penalty_factor=None)
+                unpenalized_feature_idxs = (
+                    np.where(penalty_factor == 0)[0].tolist())
+                if unpenalized_feature_idxs:
+                    penalized_feature_idxs = list(
+                        set(feature_idxs) - set(unpenalized_feature_idxs))
+                    feature_idx_groups = [[j] + unpenalized_feature_idxs
+                                          for j in penalized_feature_idxs]
+                    self.k = self._penalized_k + len(unpenalized_feature_idxs)
+            estimator.set_params(alpha=0,
+                                 penalty_factor=None,
+                                 penalty_factor_meta_col=None)
         scores = np.zeros(X.shape[1])
-        for j in penalized_feature_idxs:
-            feature_idxs = [j]
-            if unpenalized_feature_idxs.size > 0:
-                feature_idxs = np.concatenate(
-                    (feature_idxs, unpenalized_feature_idxs))
-            Xj = X[:, feature_idxs]
-            scores[j] = estimator.fit(Xj, y, **fit_params).score(Xj, y)
-        self.scores_ = scores
+        for js in feature_idx_groups:
+            Xjs = X[:, js]
+            scores[js[0]] = estimator.fit(Xjs, y, **fit_params).score(Xjs, y)
         self.estimator_ = clone(self.estimator)
         if (isinstance(estimator, FastCoxPHSurvivalAnalysis)
                 and penalty_factor is not None):
+            if unpenalized_feature_idxs:
+                for j in unpenalized_feature_idxs:
+                    scores[j] = 1.0
+            self.scores_ = scores
             self.estimator_.set_params(
-                penalty_factor=penalty_factor[self._get_support_mask()])
+                penalty_factor=penalty_factor[self.get_support()],
+                penalty_factor_meta_col=None)
+        else:
+            self.scores_ = scores
         self.estimator_.fit(self.transform(X), y, **fit_params)
         return self
 
     @if_delegate_has_method(delegate='estimator')
-    def predict(self, X):
+    def predict(self, X, **predict_params):
         """Reduce X to the selected features and then predict using the
            underlying estimator.
 
@@ -122,6 +132,9 @@ class SelectFromUnivariateModel(ExtendedSelectorMixin, MetaEstimatorMixin,
         ----------
         X : array of shape [n_samples, n_features]
             The input samples.
+
+        **predict_params : dict of string -> object
+            Parameters passed to the ``predict`` method of the estimator
 
         Returns
         -------
@@ -223,7 +236,7 @@ class SelectFromUnivariateModel(ExtendedSelectorMixin, MetaEstimatorMixin,
             raise ValueError("k should be >=0, <= n_features = %d; got %r. "
                              "Use k='all' to return all features."
                              % (X.shape[1], self.k))
-        if (isinstance(self.estimator, FastCoxPHSurvivalAnalysis)
+        if (hasattr(self.estimator, 'penalty_factor_meta_col')
                 and self.estimator.penalty_factor_meta_col is not None):
             if feature_meta is None:
                 raise ValueError('penalty_factor_meta_col specified but '
