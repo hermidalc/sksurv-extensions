@@ -1,58 +1,60 @@
-"""Univariate model feature selection."""
+"""Univariate survival model feature selection."""
 
 import numpy as np
 
+from lifelines import CoxPHFitter
 from sklearn.base import BaseEstimator, clone, MetaEstimatorMixin
 from sklearn.utils import check_X_y
-from sklearn.utils.metaestimators import if_delegate_has_method
 from sksurv.linear_model import CoxPHSurvivalAnalysis
-
 from sklearn_extensions.feature_selection._base import ExtendedSelectorMixin
-from sklearn_extensions.utils.validation import check_is_fitted
+from sklearn_extensions.utils.validation import check_is_fitted, check_memory
 from ..linear_model import FastCoxPHSurvivalAnalysis
 
 
-class SelectFromUnivariateModel(ExtendedSelectorMixin, MetaEstimatorMixin,
-                                BaseEstimator):
-    """Select features according to scores calculated from model fitting on
-    each individual feature, including adjusting for any passed prognostic
-    clinical or molecular features.
+def _get_scores(estimator, X, y, feature_idx_groups, **fit_params):
+    scores = np.zeros(X.shape[1])
+    for js in feature_idx_groups:
+        Xjs = X[:, js]
+        scores[js[0]] = estimator.fit(Xjs, y, **fit_params).score(Xjs, y)
+    return scores
+
+
+class SelectFromUnivariateSurvivalModel(ExtendedSelectorMixin,
+                                        MetaEstimatorMixin, BaseEstimator):
+    """Select features according to scores calculated from survival model
+    fitting on each individual feature, including adjusting for any passed
+    prognostic clinical or molecular features.
 
     Parameters
     ----------
     estimator : object
         The external estimator used to calculate univariate feature scores.
 
-    k : int or "all" (default=10)
+    k : int or "all" (default = "all")
         Number of top features to select.
         The "all" option bypasses selection, for use in a parameter search.
 
+    memory : None, str or object with the joblib.Memory interface \
+        (default = None)
+        Used for internal caching. By default, no caching is done.
+        If a string is given, it is the path to the caching directory.
+
     Attributes
     ----------
-    estimator_ : an estimator
-        The external estimator fit on the reduced dataset.
-
     scores_ : array-like of shape (n_features,)
         Feature scores.
     """
 
-    def __init__(self, estimator, k=10):
+    def __init__(self, estimator, k='all', memory=None):
         self.estimator = estimator
         self.k = k
+        self.memory = memory
         self._penalized_k = k
-
-    @property
-    def _estimator_type(self):
-        return self.estimator._estimator_type
-
-    @property
-    def classes_(self):
-        return self.estimator_.classes_
 
     def fit(self, X, y, feature_meta=None, **fit_params):
         """Fits an unpenalized model on each feature individually (including
         and adjusting for prognostic clinical or molecular features that are
-        passed) and calculate their scores. Then selects the ``k`` best scoring
+        passed) and calculates each score. Then selects the ``k`` best scoring
         features and fits a final penalized model on these features (including
         and adjusting for unpenalized prognostic clinical or molecular features
         that are passed).
@@ -80,10 +82,14 @@ class SelectFromUnivariateModel(ExtendedSelectorMixin, MetaEstimatorMixin,
         """
         X, y = check_X_y(X, y)
         self._check_params(X, y, feature_meta)
+        memory = check_memory(self.memory)
         feature_idxs = range(X.shape[1])
         feature_idx_groups = [[j] for j in feature_idxs]
         estimator = clone(self.estimator)
-        if isinstance(estimator, CoxPHSurvivalAnalysis):
+        if isinstance(estimator, CoxPHFitter):
+            # for optimization numerical stability
+            estimator.set_params(penalizer=1e-5)
+        elif isinstance(estimator, CoxPHSurvivalAnalysis):
             # for optimization numerical stability
             estimator.set_params(alpha=1e-5)
         elif isinstance(estimator, FastCoxPHSurvivalAnalysis):
@@ -101,131 +107,16 @@ class SelectFromUnivariateModel(ExtendedSelectorMixin, MetaEstimatorMixin,
                     feature_idx_groups = [[j] + unpenalized_feature_idxs
                                           for j in penalized_feature_idxs]
                     self.k = self._penalized_k + len(unpenalized_feature_idxs)
-            estimator.set_params(alpha=0,
-                                 penalty_factor=None,
+            estimator.set_params(alpha=0, penalty_factor=None,
                                  penalty_factor_meta_col=None)
-        scores = np.zeros(X.shape[1])
-        for js in feature_idx_groups:
-            Xjs = X[:, js]
-            scores[js[0]] = estimator.fit(Xjs, y, **fit_params).score(Xjs, y)
-        self.estimator_ = clone(self.estimator)
+        scores = memory.cache(_get_scores)(estimator, X, y, feature_idx_groups,
+                                           **fit_params)
         if (isinstance(estimator, FastCoxPHSurvivalAnalysis)
-                and penalty_factor is not None):
-            if unpenalized_feature_idxs:
-                for j in unpenalized_feature_idxs:
-                    scores[j] = 1.0
-            self.scores_ = scores
-            self.estimator_.set_params(
-                penalty_factor=penalty_factor[self.get_support()],
-                penalty_factor_meta_col=None)
-        else:
-            self.scores_ = scores
-        self.estimator_.fit(self.transform(X), y, **fit_params)
+                and penalty_factor is not None and unpenalized_feature_idxs):
+            for j in unpenalized_feature_idxs:
+                scores[j] = 1.0
+        self.scores_ = scores
         return self
-
-    @if_delegate_has_method(delegate='estimator')
-    def predict(self, X, **predict_params):
-        """Reduce X to the selected features and then predict using the
-           underlying estimator.
-
-        Parameters
-        ----------
-        X : array of shape [n_samples, n_features]
-            The input samples.
-
-        **predict_params : dict of string -> object
-            Parameters passed to the ``predict`` method of the estimator
-
-        Returns
-        -------
-        y : array of shape [n_samples]
-            The predicted target values.
-        """
-        check_is_fitted(self)
-        return self.estimator_.predict(self.transform(X))
-
-    @if_delegate_has_method(delegate='estimator')
-    def score(self, X, y, sample_weight=None):
-        """Reduce X to the selected features and then return the score of the
-           underlying estimator.
-
-        Parameters
-        ----------
-        X : array of shape [n_samples, n_features]
-            The input samples.
-
-        y : array of shape [n_samples]
-            The target values.
-
-        sample_weight : array-like, default=None
-            If not None, this argument is passed as ``sample_weight`` keyword
-            argument to the ``score`` method of the estimator.
-        """
-        check_is_fitted(self)
-        score_params = {}
-        if sample_weight is not None:
-            score_params['sample_weight'] = sample_weight
-        return self.estimator_.score(self.transform(X), y, **score_params)
-
-    @if_delegate_has_method(delegate='estimator')
-    def decision_function(self, X):
-        """Compute the decision function of ``X``.
-
-        Parameters
-        ----------
-        X : {array-like or sparse matrix} of shape (n_samples, n_features)
-            The input samples. Internally, it will be converted to
-            ``dtype=np.float32`` and if a sparse matrix is provided
-            to a sparse ``csr_matrix``.
-
-        Returns
-        -------
-        score : array, shape = [n_samples, n_classes] or [n_samples]
-            The decision function of the input samples. The order of the
-            classes corresponds to that in the attribute :term:`classes_`.
-            Regression and binary classification produce an array of shape
-            [n_samples].
-        """
-        check_is_fitted(self)
-        return self.estimator_.decision_function(self.transform(X))
-
-    @if_delegate_has_method(delegate='estimator')
-    def predict_proba(self, X):
-        """Predict class probabilities for X.
-
-        Parameters
-        ----------
-        X : {array-like or sparse matrix} of shape (n_samples, n_features)
-            The input samples. Internally, it will be converted to
-            ``dtype=np.float32`` and if a sparse matrix is provided
-            to a sparse ``csr_matrix``.
-
-        Returns
-        -------
-        p : array of shape (n_samples, n_classes)
-            The class probabilities of the input samples. The order of the
-            classes corresponds to that in the attribute :term:`classes_`.
-        """
-        check_is_fitted(self)
-        return self.estimator_.predict_proba(self.transform(X))
-
-    @if_delegate_has_method(delegate='estimator')
-    def predict_log_proba(self, X):
-        """Predict class log-probabilities for X.
-
-        Parameters
-        ----------
-        X : array of shape [n_samples, n_features]
-            The input samples.
-
-        Returns
-        -------
-        p : array of shape (n_samples, n_classes)
-            The class log-probabilities of the input samples. The order of the
-            classes corresponds to that in the attribute :term:`classes_`.
-        """
-        check_is_fitted(self)
-        return self.estimator_.predict_log_proba(self.transform(X))
 
     def _more_tags(self):
         estimator_tags = self.estimator._get_tags()
