@@ -5,6 +5,7 @@ import numpy as np
 from lifelines import CoxPHFitter
 from sklearn.base import BaseEstimator, clone, MetaEstimatorMixin
 from sklearn.utils import check_X_y
+from sklearn.utils.metaestimators import if_delegate_has_method
 from sksurv.linear_model import CoxPHSurvivalAnalysis
 from sklearn_extensions.feature_selection._base import ExtendedSelectorMixin
 from sklearn_extensions.utils.validation import check_is_fitted, check_memory
@@ -13,9 +14,14 @@ from ..linear_model import FastCoxPHSurvivalAnalysis
 
 def _get_scores(estimator, X, y, feature_idx_groups, **fit_params):
     scores = np.zeros(X.shape[1])
-    for js in feature_idx_groups:
-        Xjs = X[:, js]
-        scores[js[0]] = estimator.fit(Xjs, y, **fit_params).score(Xjs, y)
+    if isinstance(estimator, CoxPHFitter):
+        for j in feature_idx_groups:
+            scores[j[0]] = (estimator.fit(X[:, j], y, **fit_params)
+                            .log_likelihood_)
+    else:
+        for j in feature_idx_groups:
+            Xj = X[:, j]
+            scores[j[0]] = estimator.fit(Xj, y, **fit_params).score(Xj, y)
     return scores
 
 
@@ -50,6 +56,12 @@ class SelectFromUnivariateSurvivalModel(ExtendedSelectorMixin,
         self.k = k
         self.memory = memory
         self._penalized_k = k
+
+    def set_params(self, **params):
+        super().set_params(**params)
+        if 'k' in params:
+            self._penalized_k = self.k
+        return self
 
     def fit(self, X, y, feature_meta=None, **fit_params):
         """Fits an unpenalized model on each feature individually (including
@@ -86,37 +98,89 @@ class SelectFromUnivariateSurvivalModel(ExtendedSelectorMixin,
         feature_idxs = range(X.shape[1])
         feature_idx_groups = [[j] for j in feature_idxs]
         estimator = clone(self.estimator)
+        penalty_factor = (
+            feature_meta[estimator.penalty_factor_meta_col].to_numpy()
+            if (feature_meta is not None
+                and hasattr(estimator, 'penalty_factor_meta_col')
+                and estimator.penalty_factor_meta_col is not None)
+            else estimator.penalty_factor
+            if (hasattr(estimator, 'penalty_factor')
+                and estimator.penalty_factor is not None)
+            else None)
+        if penalty_factor is not None:
+            unpenalized_feature_idxs = (np.where(penalty_factor == 0)[0]
+                                        .tolist())
+            if unpenalized_feature_idxs:
+                penalized_feature_idxs = list(
+                    set(feature_idxs) - set(unpenalized_feature_idxs))
+                feature_idx_groups = [[j] + unpenalized_feature_idxs
+                                      for j in penalized_feature_idxs]
+                self.k = self._penalized_k + len(unpenalized_feature_idxs)
         if isinstance(estimator, CoxPHFitter):
-            # for optimization numerical stability
             estimator.set_params(penalizer=1e-5)
         elif isinstance(estimator, CoxPHSurvivalAnalysis):
-            # for optimization numerical stability
             estimator.set_params(alpha=1e-5)
         elif isinstance(estimator, FastCoxPHSurvivalAnalysis):
-            penalty_factor = (
-                feature_meta[estimator.penalty_factor_meta_col].to_numpy()
-                if estimator.penalty_factor_meta_col is not None else
-                estimator.penalty_factor
-                if estimator.penalty_factor is not None else None)
-            if penalty_factor is not None:
-                unpenalized_feature_idxs = (
-                    np.where(penalty_factor == 0)[0].tolist())
-                if unpenalized_feature_idxs:
-                    penalized_feature_idxs = list(
-                        set(feature_idxs) - set(unpenalized_feature_idxs))
-                    feature_idx_groups = [[j] + unpenalized_feature_idxs
-                                          for j in penalized_feature_idxs]
-                    self.k = self._penalized_k + len(unpenalized_feature_idxs)
             estimator.set_params(alpha=0, penalty_factor=None,
                                  penalty_factor_meta_col=None)
         scores = memory.cache(_get_scores)(estimator, X, y, feature_idx_groups,
                                            **fit_params)
-        if (isinstance(estimator, FastCoxPHSurvivalAnalysis)
-                and penalty_factor is not None and unpenalized_feature_idxs):
+        self.estimator_ = clone(self.estimator)
+        if penalty_factor is not None and unpenalized_feature_idxs:
             for j in unpenalized_feature_idxs:
                 scores[j] = 1.0
         self.scores_ = scores
+        if isinstance(estimator, FastCoxPHSurvivalAnalysis):
+            self.estimator_.set_params(
+                penalty_factor=penalty_factor[self.get_support()],
+                penalty_factor_meta_col=None)
+        self.estimator_.fit(self.transform(X), y, **fit_params)
         return self
+
+    @if_delegate_has_method(delegate='estimator')
+    def predict(self, X, **predict_params):
+        """Reduce X to the selected features and then predict using the
+           underlying estimator.
+
+        Parameters
+        ----------
+        X : array of shape [n_samples, n_features]
+            The input samples.
+
+        **predict_params : dict of string -> object
+            Parameters passed to the ``predict`` method of the estimator
+
+        Returns
+        -------
+        y : array of shape [n_samples]
+            The predicted target values.
+        """
+        check_is_fitted(self)
+        return self.estimator_.predict(self.transform(X), **predict_params)
+
+    @if_delegate_has_method(delegate='estimator')
+    def score(self, X, y, sample_weight=None):
+        """Reduce X to the selected features and then return the score of the
+           underlying estimator.
+
+        Parameters
+        ----------
+        X : array of shape [n_samples, n_features]
+            The input samples.
+
+        y : array of shape [n_samples]
+            The target values.
+
+        sample_weight : array-like, default=None
+            If not None, this argument is passed as ``sample_weight`` keyword
+            argument to the ``score`` method of the estimator.
+        """
+        check_is_fitted(self)
+        score_params = {}
+        if sample_weight is not None:
+            score_params['sample_weight'] = sample_weight
+        return self.estimator_.score(self.transform(X), y, **score_params)
+
 
     def _more_tags(self):
         estimator_tags = self.estimator._get_tags()
