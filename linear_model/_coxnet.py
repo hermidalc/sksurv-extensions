@@ -205,7 +205,7 @@ class FastCoxPHSurvivalAnalysis(ExtendedCoxnetSurvivalAnalysis):
     copy_X : boolean (default=True)
         If ``True``, X will be copied; else, it may be overwritten.
 
-    tol : float (default=1e-15)
+    tol : float (default=1e-12)
         The tolerance for the optimization: optimization continues until all
         updates are smaller than ``tol``. **Do not change unless there are
         issues with a particular dataset.**
@@ -247,7 +247,7 @@ class FastCoxPHSurvivalAnalysis(ExtendedCoxnetSurvivalAnalysis):
 
     def __init__(self, alpha=0, l1_ratio=1e-40, penalty_factor=None,
                  penalty_factor_meta_col=None, normalize=False, copy_X=True,
-                 tol=1e-16, max_iter=1000000, verbose=False,
+                 tol=1e-12, max_iter=1000000, verbose=False,
                  fit_baseline_model=False):
         super().__init__(
             l1_ratio=l1_ratio, penalty_factor=penalty_factor,
