@@ -47,6 +47,9 @@ class SelectFromUnivariateSurvivalModel(ExtendedSelectorMixin,
 
     Attributes
     ----------
+    estimator_ : an estimator
+        The external estimator fit on the reduced dataset.
+
     scores_ : array-like of shape (n_features,)
         Feature scores.
     """
