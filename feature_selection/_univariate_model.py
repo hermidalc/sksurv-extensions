@@ -15,13 +15,13 @@ from ..linear_model import FastCoxPHSurvivalAnalysis
 def _get_scores(estimator, X, y, feature_idx_groups, **fit_params):
     scores = np.zeros(X.shape[1])
     if isinstance(estimator, CoxPHFitter):
-        for j in feature_idx_groups:
-            scores[j[0]] = (estimator.fit(X[:, j], y, **fit_params)
-                            .log_likelihood_)
+        for js in feature_idx_groups:
+            scores[js[0]] = (estimator.fit(X[:, js], y, **fit_params)
+                             .log_likelihood_)
     else:
-        for j in feature_idx_groups:
-            Xj = X[:, j]
-            scores[j[0]] = estimator.fit(Xj, y, **fit_params).score(Xj, y)
+        for js in feature_idx_groups:
+            Xjs = X[:, js]
+            scores[js[0]] = estimator.fit(Xjs, y, **fit_params).score(Xjs, y)
     return scores
 
 
