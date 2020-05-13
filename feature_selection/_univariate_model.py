@@ -159,7 +159,7 @@ class SelectFromUnivariateSurvivalModel(ExtendedSelectorMixin,
             The predicted target values.
         """
         check_is_fitted(self)
-        return self.estimator_.predict(self.transform(X), **predict_params)
+        return self.estimator_.predict(self.transform(X))
 
     @if_delegate_has_method(delegate='estimator')
     def score(self, X, y, sample_weight=None):
