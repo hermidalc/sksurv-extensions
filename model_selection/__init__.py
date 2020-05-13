@@ -2,7 +2,8 @@
 The :mod:`sksurv_extensions.model_selection` module.
 """
 
-from ._split import SurvivalStratifiedKFold
+from ._split import RepeatedSurvivalStratifiedKFold, SurvivalStratifiedKFold
 
 
-__all__ = ['SurvivalStratifiedKFold']
+__all__ = ['RepeatedSurvivalStratifiedKFold',
+           'SurvivalStratifiedKFold']

@@ -3,6 +3,7 @@
 # License: BSD 3 clause
 
 from sklearn.model_selection import StratifiedKFold
+from sklearn.model_selection._split import _RepeatedSplits
 
 
 class SurvivalStratifiedKFold(StratifiedKFold):
@@ -49,3 +50,36 @@ class SurvivalStratifiedKFold(StratifiedKFold):
         y = y[y.dtype.names[0]].astype(int)
         test_folds = super()._make_test_folds(X, y)
         return test_folds
+
+
+class RepeatedSurvivalStratifiedKFold(_RepeatedSplits):
+    """Repeated Survival Stratified K-Fold cross validator.
+
+    Repeats Stratified K-Fold with non-overlapping groups n times with
+    different randomization in each repetition.
+
+    Read more in the :ref:`User Guide <cross_validation>`.
+
+    Parameters
+    ----------
+    n_splits : int, default=5
+        Number of folds. Must be at least 2.
+
+    n_repeats : int, default=10
+        Number of times cross-validator needs to be repeated.
+
+    random_state : int or RandomState instance, default=None
+        Controls the generation of the random states for each repetition.
+        Pass an int for reproducible output across multiple function calls.
+        See :term:`Glossary <random_state>`.
+
+    Notes
+    -----
+    Randomized CV splitters may return different results for each call of
+    split. You can make the results identical by setting `random_state`
+    to an integer.
+    """
+
+    def __init__(self, n_splits=5, n_repeats=10, random_state=None):
+        super().__init__(SurvivalStratifiedKFold, n_splits=n_splits,
+                         n_repeats=n_repeats, random_state=random_state)
