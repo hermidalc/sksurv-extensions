@@ -146,9 +146,7 @@ class ExtendedCoxnetSurvivalAnalysis(CoxnetSurvivalAnalysis):
             were used during training. If set to ``None``, the last alpha in
             the solution path is used.
 
-        feature_meta : pandas.DataFrame, pandas.Series (default = None), \
-            shape = (n_features, n_metadata)
-            Feature metadata.
+        feature_meta : Ignored.
 
         Returns
         -------
