@@ -138,7 +138,7 @@ class SelectFromUnivariateSurvivalModel(ExtendedSelectorMixin,
         if isinstance(self.estimator_, CoxPHSurvivalAnalysis):
             alpha = self.estimator_.alpha
             if isinstance(alpha, (numbers.Real, numbers.Integral)):
-                alphas = np.full((X.shape[1],), alpha, dtype=float)
+                alphas = np.full(X.shape[1], alpha, dtype=float)
             else:
                 alphas = alpha
             if penalty_factor is not None:
