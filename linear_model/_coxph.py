@@ -3,7 +3,7 @@
 import numbers
 import numpy as np
 
-from sklearn.utils import check_array, check_X_y
+from sklearn.utils import check_X_y
 from sksurv.linear_model import CoxPHSurvivalAnalysis
 
 
@@ -47,7 +47,8 @@ class ExtendedCoxPHSurvivalAnalysis(CoxPHSurvivalAnalysis):
 
     penalty_factor_meta_col : str (default=None)
         Feature metadata column name to use for penalty factors.  These will be
-        used to adjust ``alpha``.
+        used to adjust ``alpha``.  This is ignored if ``alpha`` is an array
+        of penalties.
 
     Attributes
     ----------
@@ -101,16 +102,9 @@ class ExtendedCoxPHSurvivalAnalysis(CoxPHSurvivalAnalysis):
         """
         X, y = check_X_y(X, y)
         self.__check_params(X, y, feature_meta)
-        if self.penalty_factor_meta_col is not None:
-            if isinstance(self.alpha, (numbers.Real, numbers.Integral)):
-                alphas = np.full((X.shape[1],), self.alpha, dtype=float)
-            else:
-                alphas = self.alpha
-            alphas = check_array(alphas, ensure_2d=False, ensure_min_samples=0)
-            if alphas.shape[0] != X.shape[1]:
-                raise ValueError('Length of alphas ({}) must match number of '
-                                 'features ({}).'.format(alphas.shape[0],
-                                                         X.shape[1]))
+        if (isinstance(self.alpha, (numbers.Real, numbers.Integral))
+                and self.penalty_factor_meta_col is not None):
+            alphas = np.full((X.shape[1],), self.alpha, dtype=float)
             penalty_factor = (feature_meta[self.penalty_factor_meta_col]
                               .to_numpy())
             if alphas.shape[0] != penalty_factor.shape[0]:
@@ -119,7 +113,6 @@ class ExtendedCoxPHSurvivalAnalysis(CoxPHSurvivalAnalysis):
                                  .format(alphas.shape[0],
                                          penalty_factor.shape[0]))
             alphas *= penalty_factor
-            # for optimization numerical stability
             alphas[alphas < 1e-5] = 1e-5
             self.alpha = alphas
         return super().fit(X, y)

@@ -1,5 +1,6 @@
 """Univariate survival model feature selection."""
 
+import numbers
 import numpy as np
 
 from lifelines import CoxPHFitter
@@ -129,15 +130,23 @@ class SelectFromUnivariateSurvivalModel(ExtendedSelectorMixin,
             estimator.set_params(penalty_factor_meta_col=None)
         scores = memory.cache(_get_scores)(estimator, X, y, feature_idx_groups,
                                            **fit_params)
-        self.estimator_ = clone(self.estimator)
         if penalty_factor is not None and unpenalized_feature_idxs:
             for j in unpenalized_feature_idxs:
                 scores[j] = 1.0
         self.scores_ = scores
-        if isinstance(estimator, CoxPHSurvivalAnalysis):
-            self.estimator_.set_params(
-                alpha=penalty_factor[self.get_support()])
-        elif isinstance(estimator, FastCoxPHSurvivalAnalysis):
+        self.estimator_ = clone(self.estimator)
+        if isinstance(self.estimator_, CoxPHSurvivalAnalysis):
+            alpha = self.estimator_.alpha
+            if isinstance(alpha, (numbers.Real, numbers.Integral)):
+                alphas = np.full((X.shape[1],), alpha, dtype=float)
+            else:
+                alphas = alpha
+            if penalty_factor is not None:
+                alphas *= penalty_factor
+                alphas[alphas < 1e-5] = 1e-5
+            self.estimator_.set_params(alpha=alphas[self.get_support()])
+        elif (isinstance(self.estimator_, FastCoxPHSurvivalAnalysis)
+              and penalty_factor is not None):
             self.estimator_.set_params(
                 penalty_factor=penalty_factor[self.get_support()])
         if hasattr(self.estimator_, 'penalty_factor_meta_col'):

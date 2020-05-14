@@ -40,8 +40,8 @@ class ExtendedCoxnetSurvivalAnalysis(CoxnetSurvivalAnalysis):
         alphas sequence will reflect this change.
 
     penalty_factor_meta_col : str (default=None)
-        Feature metadata column name to use for ``penalty_factor``. This
-        overrides any ``penalty_factor`` setting if both are set.
+        Feature metadata column name to use for ``penalty_factor``. This is
+        ignored if ``penalty_factor`` is not None.
 
     normalize : boolean (default=False)
         If True, the features X will be normalized before optimization by
@@ -126,7 +126,8 @@ class ExtendedCoxnetSurvivalAnalysis(CoxnetSurvivalAnalysis):
         """
         X, y = check_X_y(X, y)
         self.__check_params(X, y, feature_meta)
-        if self.penalty_factor_meta_col is not None:
+        if (self.penalty_factor is None
+                and self.penalty_factor_meta_col is not None):
             self.penalty_factor = (feature_meta[self.penalty_factor_meta_col]
                                    .to_numpy())
         return super().fit(X, y)
@@ -191,8 +192,8 @@ class FastCoxPHSurvivalAnalysis(ExtendedCoxnetSurvivalAnalysis):
         alphas sequence will reflect this change.
 
     penalty_factor_meta_col : str (default=None)
-        Feature metadata column name to use for ``penalty_factor``. This
-        overrides any ``penalty_factor`` setting if both are set.
+        Feature metadata column name to use for ``penalty_factor``. This is
+        ignored if ``penalty_factor`` is not None.
 
     normalize : boolean (default=False)
         If True, the features X will be normalized before optimization by
