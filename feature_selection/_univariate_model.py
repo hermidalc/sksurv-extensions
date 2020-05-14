@@ -124,8 +124,9 @@ class SelectFromUnivariateSurvivalModel(ExtendedSelectorMixin,
         elif isinstance(estimator, CoxPHSurvivalAnalysis):
             estimator.set_params(alpha=1e-5)
         elif isinstance(estimator, FastCoxPHSurvivalAnalysis):
-            estimator.set_params(alpha=0, penalty_factor=None,
-                                 penalty_factor_meta_col=None)
+            estimator.set_params(alpha=0, penalty_factor=None)
+        if hasattr(estimator, 'penalty_factor_meta_col'):
+            estimator.set_params(penalty_factor_meta_col=None)
         scores = memory.cache(_get_scores)(estimator, X, y, feature_idx_groups,
                                            **fit_params)
         self.estimator_ = clone(self.estimator)
@@ -133,10 +134,14 @@ class SelectFromUnivariateSurvivalModel(ExtendedSelectorMixin,
             for j in unpenalized_feature_idxs:
                 scores[j] = 1.0
         self.scores_ = scores
-        if isinstance(estimator, FastCoxPHSurvivalAnalysis):
+        if isinstance(estimator, CoxPHSurvivalAnalysis):
             self.estimator_.set_params(
-                penalty_factor=penalty_factor[self.get_support()],
-                penalty_factor_meta_col=None)
+                alpha=penalty_factor[self.get_support()])
+        elif isinstance(estimator, FastCoxPHSurvivalAnalysis):
+            self.estimator_.set_params(
+                penalty_factor=penalty_factor[self.get_support()])
+        if hasattr(self.estimator_, 'penalty_factor_meta_col'):
+            self.estimator_.set_params(penalty_factor_meta_col=None)
         self.estimator_.fit(self.transform(X), y, **fit_params)
         return self
 

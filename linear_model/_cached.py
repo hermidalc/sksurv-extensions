@@ -1,11 +1,13 @@
-from sksurv.linear_model import CoxPHSurvivalAnalysis
+from ._coxph import ExtendedCoxPHSurvivalAnalysis
 from .._cached import CachedFitMixin
 
 
-class CachedCoxPHSurvivalAnalysis(CachedFitMixin, CoxPHSurvivalAnalysis):
+class CachedExtendedCoxPHSurvivalAnalysis(CachedFitMixin,
+                                          ExtendedCoxPHSurvivalAnalysis):
 
-    def __init__(self, memory, alpha=0, ties='breslow', n_iter=100, tol=1e-9,
-                 verbose=0):
-        self.memory = memory
+    def __init__(self, memory, alpha=0, ties='efron', n_iter=1000, tol=1e-9,
+                 verbose=0, penalty_factor_meta_col=None):
         super().__init__(alpha=alpha, ties=ties, n_iter=n_iter, tol=tol,
-                         verbose=verbose)
+                         verbose=verbose,
+                         penalty_factor_meta_col=penalty_factor_meta_col)
+        self.memory = memory
