@@ -104,15 +104,15 @@ class ExtendedCoxPHSurvivalAnalysis(CoxPHSurvivalAnalysis):
         self.__check_params(X, y, feature_meta)
         if (isinstance(self.alpha, (numbers.Real, numbers.Integral))
                 and self.penalty_factor_meta_col is not None):
-            alphas = np.full((X.shape[1],), self.alpha, dtype=float)
+            alphas = np.full(X.shape[1], self.alpha, dtype=float)
             penalty_factor = (feature_meta[self.penalty_factor_meta_col]
-                              .to_numpy())
+                              .to_numpy(dtype=float))
             if alphas.shape[0] != penalty_factor.shape[0]:
                 raise ValueError('Length of alphas ({}) must match length of '
                                  'penalty_factor_meta_col ({}).'
                                  .format(alphas.shape[0],
                                          penalty_factor.shape[0]))
-            alphas *= penalty_factor
+            alphas = alphas * penalty_factor
             alphas[alphas < 1e-5] = 1e-5
             self.alpha = alphas
         return super().fit(X, y)

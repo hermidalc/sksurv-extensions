@@ -129,7 +129,7 @@ class ExtendedCoxnetSurvivalAnalysis(CoxnetSurvivalAnalysis):
         if (self.penalty_factor is None
                 and self.penalty_factor_meta_col is not None):
             self.penalty_factor = (feature_meta[self.penalty_factor_meta_col]
-                                   .to_numpy())
+                                   .to_numpy(dtype=float))
         return super().fit(X, y)
 
     def predict(self, X, alpha=None, feature_meta=None):

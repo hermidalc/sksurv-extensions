@@ -103,7 +103,8 @@ class SelectFromUnivariateSurvivalModel(ExtendedSelectorMixin,
         feature_idx_groups = [[j] for j in feature_idxs]
         estimator = clone(self.estimator)
         penalty_factor = (
-            feature_meta[estimator.penalty_factor_meta_col].to_numpy()
+            feature_meta[estimator.penalty_factor_meta_col]
+            .to_numpy(dtype=float)
             if (feature_meta is not None
                 and hasattr(estimator, 'penalty_factor_meta_col')
                 and estimator.penalty_factor_meta_col is not None)
@@ -142,7 +143,7 @@ class SelectFromUnivariateSurvivalModel(ExtendedSelectorMixin,
             else:
                 alphas = alpha
             if penalty_factor is not None:
-                alphas *= penalty_factor
+                alphas = alphas * penalty_factor
                 alphas[alphas < 1e-5] = 1e-5
             self.estimator_.set_params(alpha=alphas[self.get_support()])
         elif (isinstance(self.estimator_, FastCoxPHSurvivalAnalysis)
