@@ -45,6 +45,9 @@ class ExtendedCoxPHSurvivalAnalysis(CoxPHSurvivalAnalysis):
         Specified the amount of additional debug information
         during optimization.
 
+    base_alpha : float (default=1e-5)
+        Base regularization parameter to support regression convergence.
+
     penalty_factor_meta_col : str (default=None)
         Feature metadata column name to use for penalty factors.  These will be
         used to adjust ``alpha``.  This is ignored if ``alpha`` is an array
@@ -74,9 +77,10 @@ class ExtendedCoxPHSurvivalAnalysis(CoxPHSurvivalAnalysis):
     """
 
     def __init__(self, alpha=0, ties='efron', n_iter=1000, tol=1e-9,
-                 verbose=0, penalty_factor_meta_col=None):
+                 verbose=0, base_alpha=1e-5, penalty_factor_meta_col=None):
         super().__init__(alpha=alpha, ties=ties, n_iter=n_iter, tol=tol,
                          verbose=verbose)
+        self.base_alpha = base_alpha
         self.penalty_factor_meta_col = penalty_factor_meta_col
 
     def fit(self, X, y, feature_meta=None):
@@ -113,7 +117,7 @@ class ExtendedCoxPHSurvivalAnalysis(CoxPHSurvivalAnalysis):
                                  .format(alphas.shape[0],
                                          penalty_factor.shape[0]))
             alphas = alphas * penalty_factor
-            alphas[alphas < 1e-5] = 1e-5
+            alphas[alphas < self.base_alpha] = self.base_alpha
             self.alpha = alphas
         return super().fit(X, y)
 
