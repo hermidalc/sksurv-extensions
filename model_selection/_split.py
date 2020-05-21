@@ -5,6 +5,8 @@
 from sklearn.model_selection import StratifiedKFold
 from sklearn.model_selection._split import _RepeatedSplits
 
+from sklearn_extensions.model_selection import StratifiedGroupKFold
+
 
 class SurvivalStratifiedKFold(StratifiedKFold):
     """Survival Stratified K-Folds cross-validator
@@ -48,8 +50,7 @@ class SurvivalStratifiedKFold(StratifiedKFold):
     def _make_test_folds(self, X, y):
         # make sksurv structured array look like binary class (on status)
         y = y[y.dtype.names[0]].astype(int)
-        test_folds = super()._make_test_folds(X, y)
-        return test_folds
+        return super()._make_test_folds(X, y)
 
 
 class RepeatedSurvivalStratifiedKFold(_RepeatedSplits):
@@ -82,4 +83,64 @@ class RepeatedSurvivalStratifiedKFold(_RepeatedSplits):
 
     def __init__(self, n_splits=5, n_repeats=10, random_state=None):
         super().__init__(SurvivalStratifiedKFold, n_splits=n_splits,
+                         n_repeats=n_repeats, random_state=random_state)
+
+
+class SurvivalStratifiedGroupKFold(StratifiedGroupKFold):
+    """Survival Stratified K-Folds iterator variant with non-overlapping
+    groups.
+
+    Parameters
+    ----------
+    n_splits : int, default=5
+        Number of folds. Must be at least 2.
+
+    shuffle : bool, default=False
+        Whether to shuffle each class's samples before splitting into batches.
+        Note that the samples within each split will not be shuffled.
+
+    random_state : int or RandomState instance, default=None
+        When `shuffle` is True, `random_state` affects the ordering of the
+        indices, which controls the randomness of each fold for each class.
+        Otherwise, leave `random_state` as `None`.
+        Pass an int for reproducible output across multiple function calls.
+        See :term:`Glossary <random_state>`.
+    """
+
+    def __init__(self, n_splits=5, shuffle=False, random_state=None):
+        super().__init__(n_splits=n_splits, shuffle=shuffle,
+                         random_state=random_state)
+
+    def _iter_test_indices(self, X, y, groups):
+        # make sksurv structured array look like binary class (on status)
+        y = y[y.dtype.names[0]].astype(int)
+        return super()._iter_test_indices(X, y, groups)
+
+
+class RepeatedSurvivalStratifiedGroupKFold(_RepeatedSplits):
+    """Repeated Survival Stratified K-Fold iterator variant with
+    non-overlapping groups.
+
+    Parameters
+    ----------
+    n_splits : int, default=5
+        Number of folds. Must be at least 2.
+
+    n_repeats : int, default=10
+        Number of times cross-validator needs to be repeated.
+
+    random_state : int or RandomState instance, default=None
+        Controls the generation of the random states for each repetition.
+        Pass an int for reproducible output across multiple function calls.
+        See :term:`Glossary <random_state>`.
+
+    Notes
+    -----
+    Randomized CV splitters may return different results for each call of
+    split. You can make the results identical by setting `random_state`
+    to an integer.
+    """
+
+    def __init__(self, n_splits=5, n_repeats=10, random_state=None):
+        super().__init__(SurvivalStratifiedGroupKFold, n_splits=n_splits,
                          n_repeats=n_repeats, random_state=random_state)
