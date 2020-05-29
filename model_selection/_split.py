@@ -5,8 +5,9 @@
 from sklearn.model_selection import StratifiedKFold
 from sklearn.model_selection._split import _RepeatedSplits
 
-from sklearn_extensions.model_selection import (StratifiedGroupKFold,
-                                                StratifiedSampleFromGroupKFold)
+from sklearn_extensions.model_selection import (
+    StratifiedGroupKFold, StratifiedSampleFromGroupKFold,
+    StratifiedSampleFromGroupShuffleSplit)
 
 
 class SurvivalStratifiedKFold(StratifiedKFold):
@@ -48,10 +49,9 @@ class SurvivalStratifiedKFold(StratifiedKFold):
       sample.
     """
 
-    def _make_test_folds(self, X, y):
-        # make sksurv structured array look like binary class (on status)
+    def split(self, X, y, groups):
         y = y[y.dtype.names[0]].astype(int)
-        return super()._make_test_folds(X, y)
+        return super().split(X, y, groups)
 
 
 class RepeatedSurvivalStratifiedKFold(_RepeatedSplits):
@@ -108,10 +108,9 @@ class SurvivalStratifiedGroupKFold(StratifiedGroupKFold):
         See :term:`Glossary <random_state>`.
     """
 
-    def _iter_test_indices(self, X, y, groups):
-        # make sksurv structured array look like binary class (on status)
+    def split(self, X, y, groups):
         y = y[y.dtype.names[0]].astype(int)
-        return super()._iter_test_indices(X, y, groups)
+        return super().split(X, y, groups)
 
 
 class RepeatedSurvivalStratifiedGroupKFold(_RepeatedSplits):
@@ -145,10 +144,9 @@ class RepeatedSurvivalStratifiedGroupKFold(_RepeatedSplits):
 
 class SurvivalStratifiedSampleFromGroupKFold(StratifiedSampleFromGroupKFold):
 
-    def _make_test_folds(self, X, y):
-        # make sksurv structured array look like binary class (on status)
+    def split(self, X, y, groups):
         y = y[y.dtype.names[0]].astype(int)
-        return super()._make_test_folds(X, y)
+        return super().split(X, y, groups)
 
 
 class RepeatedSurvivalStratifiedSampleFromGroupKFold(_RepeatedSplits):
@@ -157,3 +155,11 @@ class RepeatedSurvivalStratifiedSampleFromGroupKFold(_RepeatedSplits):
         super().__init__(SurvivalStratifiedSampleFromGroupKFold,
                          n_splits=n_splits, n_repeats=n_repeats,
                          random_state=random_state)
+
+
+class SurvivalStratifiedSampleFromGroupShuffleSplit(
+        StratifiedSampleFromGroupShuffleSplit):
+
+    def split(self, X, y, groups):
+        y = y[y.dtype.names[0]].astype(int)
+        return super().split(X, y, groups)
