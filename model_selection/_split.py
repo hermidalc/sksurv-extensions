@@ -2,7 +2,7 @@
 #
 # License: BSD 3 clause
 
-from sklearn.model_selection import StratifiedKFold
+from sklearn.model_selection import StratifiedKFold, StratifiedShuffleSplit
 from sklearn.model_selection._split import _RepeatedSplits
 
 from sklearn_extensions.model_selection import (
@@ -155,6 +155,13 @@ class RepeatedSurvivalStratifiedSampleFromGroupKFold(_RepeatedSplits):
         super().__init__(SurvivalStratifiedSampleFromGroupKFold,
                          n_splits=n_splits, n_repeats=n_repeats,
                          random_state=random_state)
+
+
+class SurvivalStratifiedShuffleSplit(StratifiedShuffleSplit):
+
+    def split(self, X, y, groups):
+        y = y[y.dtype.names[0]].astype(int)
+        return super().split(X, y, groups)
 
 
 class SurvivalStratifiedGroupShuffleSplit(StratifiedGroupShuffleSplit):

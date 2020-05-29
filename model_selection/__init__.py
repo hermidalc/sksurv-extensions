@@ -7,7 +7,7 @@ from ._split import (
     SurvivalStratifiedGroupKFold, RepeatedSurvivalStratifiedGroupKFold,
     SurvivalStratifiedSampleFromGroupKFold,
     RepeatedSurvivalStratifiedSampleFromGroupKFold,
-    SurvivalStratifiedGroupShuffleSplit,
+    SurvivalStratifiedShuffleSplit, SurvivalStratifiedGroupShuffleSplit,
     SurvivalStratifiedSampleFromGroupShuffleSplit)
 
 
@@ -17,5 +17,6 @@ __all__ = ['SurvivalStratifiedKFold',
            'RepeatedSurvivalStratifiedKFold',
            'RepeatedSurvivalStratifiedGroupKFold',
            'RepeatedSurvivalStratifiedSampleFromGroupKFold',
+           'SurvivalStratifiedShuffleSplit',
            'SurvivalStratifiedGroupShuffleSplit',
            'SurvivalStratifiedSampleFromGroupShuffleSplit']
