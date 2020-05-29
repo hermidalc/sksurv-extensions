@@ -7,7 +7,7 @@ from sklearn.model_selection._split import _RepeatedSplits
 
 from sklearn_extensions.model_selection import (
     StratifiedGroupKFold, StratifiedSampleFromGroupKFold,
-    StratifiedSampleFromGroupShuffleSplit)
+    StratifiedGroupShuffleSplit, StratifiedSampleFromGroupShuffleSplit)
 
 
 class SurvivalStratifiedKFold(StratifiedKFold):
@@ -155,6 +155,13 @@ class RepeatedSurvivalStratifiedSampleFromGroupKFold(_RepeatedSplits):
         super().__init__(SurvivalStratifiedSampleFromGroupKFold,
                          n_splits=n_splits, n_repeats=n_repeats,
                          random_state=random_state)
+
+
+class SurvivalStratifiedGroupShuffleSplit(StratifiedGroupShuffleSplit):
+
+    def split(self, X, y, groups):
+        y = y[y.dtype.names[0]].astype(int)
+        return super().split(X, y, groups)
 
 
 class SurvivalStratifiedSampleFromGroupShuffleSplit(
