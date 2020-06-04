@@ -1,7 +1,11 @@
 """Coxnet extensions."""
 
+from sklearn.base import BaseEstimator, clone, MetaEstimatorMixin
 from sklearn.utils import check_X_y
+from sklearn.utils.metaestimators import if_delegate_has_method
+from sklearn.utils.validation import check_is_fitted
 from sksurv.linear_model import CoxnetSurvivalAnalysis
+from sksurv.metrics import concordance_index_censored
 
 
 class ExtendedCoxnetSurvivalAnalysis(CoxnetSurvivalAnalysis):
@@ -154,7 +158,30 @@ class ExtendedCoxnetSurvivalAnalysis(CoxnetSurvivalAnalysis):
         T : array, shape = (n_samples,)
             The predicted decision function
         """
-        return super().predict(X, alpha)
+        return super().predict(X, alpha=alpha)
+
+    def score(self, X, y, alpha=None):
+        """Returns the concordance index of the prediction.
+
+        Parameters
+        ----------
+        X : array-like, shape = (n_samples, n_features)
+            Test samples.
+
+        y : structured array, shape = (n_samples,)
+            A structured array containing the binary event indicator
+            as first field, and time of event or time of censoring as
+            second field.
+
+        Returns
+        -------
+        cindex : float
+            Estimated concordance index.
+        """
+        name_event, name_time = y.dtype.names
+        result = concordance_index_censored(y[name_event], y[name_time],
+                                            self.predict(X, alpha=alpha))
+        return result[0]
 
     # double underscore to not override parent
     def __check_params(self, X, y, feature_meta):
@@ -278,3 +305,61 @@ class FastCoxPHSurvivalAnalysis(ExtendedCoxnetSurvivalAnalysis):
         """
         self.alphas = [self.alpha / X.shape[0]]
         return super().fit(X, y, feature_meta)
+
+
+class MetaCoxnetSurvivalAnalysis(MetaEstimatorMixin, BaseEstimator):
+
+    def __init__(self, estimator, alpha=None):
+        self.estimator = estimator
+        self.alpha = alpha
+
+    @property
+    def coef_(self):
+        check_is_fitted(self)
+        return self.estimator_._get_coef(self.alpha)
+
+    def fit(self, X, y, **fit_params):
+        X, y = check_X_y(X, y, dtype=None)
+        self._check_params(X, y)
+        self.estimator_ = clone(self.estimator)
+        self.estimator_.fit(X, y, **fit_params)
+        return self
+
+    @if_delegate_has_method(delegate='estimator')
+    def predict(self, X, **predict_params):
+        check_is_fitted(self)
+        return self.estimator_.predict(X, alpha=self.alpha)
+
+    @if_delegate_has_method(delegate='estimator')
+    def predict_cumulative_hazard_function(self, X, **predict_params):
+        check_is_fitted(self)
+        return self.estimator_.predict_cumulative_hazard_function(
+            X, alpha=self.alpha)
+
+    @if_delegate_has_method(delegate='estimator')
+    def predict_survival_function(self, X, **predict_params):
+        check_is_fitted(self)
+        return self.estimator_.predict_survival_function(X, alpha=self.alpha)
+
+    @if_delegate_has_method(delegate='estimator')
+    def score(self, X, y, sample_weight=None):
+        check_is_fitted(self)
+        score_params = {}
+        if sample_weight is not None:
+            score_params['sample_weight'] = sample_weight
+        return self.estimator_.score(X, y, alpha=self.alpha, **score_params)
+
+    def _more_tags(self):
+        estimator_tags = self.estimator._get_tags()
+        return {'allow_nan': estimator_tags.get('allow_nan', True)}
+
+    def _check_params(self, X, y):
+        if not isinstance(self.estimator, CoxnetSurvivalAnalysis):
+            raise TypeError('{} estimator should be an instance of '
+                            'CoxnetSurvivalAnalysis.'
+                            .format(self.estimator.__class__.__name__))
+        if self.estimator.alphas is not None:
+            raise TypeError('{} estimator alphas parameter should be set to '
+                            'None, got {} instead.'
+                            .format(self.estimator.__class__.__name__,
+                                    self.estimator.alphas))
