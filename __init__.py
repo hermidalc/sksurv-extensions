@@ -65,7 +65,7 @@ def predict_survival_function(self, X, **predict_params):
     return self.steps[-1][-1].predict_survival_function(Xt, **predict_params)
 
 
-ExtendedPipeline.predict_survival_function = (
-    predict_survival_function)
 ExtendedPipeline.predict_cumulative_hazard_function = (
     predict_cumulative_hazard_function)
+ExtendedPipeline.predict_survival_function = (
+    predict_survival_function)
