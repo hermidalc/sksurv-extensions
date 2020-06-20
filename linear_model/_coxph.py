@@ -147,3 +147,7 @@ class ExtendedCoxPHSurvivalAnalysis(CoxPHSurvivalAnalysis):
             if self.penalty_factor_meta_col not in feature_meta.columns:
                 raise ValueError('%s feature_meta column does not exist.'
                                  % self.penalty_factor_meta_col)
+            if X.shape[1] != feature_meta.shape[0]:
+                raise ValueError('X ({:d}) and feature_meta ({:d}) have '
+                                 'different feature dimensions'
+                                 .format(X.shape[1], feature_meta.shape[0]))
