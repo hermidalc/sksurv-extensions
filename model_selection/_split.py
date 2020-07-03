@@ -144,9 +144,9 @@ class RepeatedSurvivalStratifiedGroupKFold(_RepeatedSplits):
 
 class SurvivalStratifiedSampleFromGroupKFold(StratifiedSampleFromGroupKFold):
 
-    def split(self, X, y, groups):
+    def split(self, X, y, groups, weights=None):
         y = y[y.dtype.names[0]].astype(int)
-        return super().split(X, y, groups)
+        return super().split(X, y, groups, weights)
 
 
 class RepeatedSurvivalStratifiedSampleFromGroupKFold(_RepeatedSplits):
@@ -174,6 +174,6 @@ class SurvivalStratifiedGroupShuffleSplit(StratifiedGroupShuffleSplit):
 class SurvivalStratifiedSampleFromGroupShuffleSplit(
         StratifiedSampleFromGroupShuffleSplit):
 
-    def split(self, X, y, groups):
+    def split(self, X, y, groups, weights=None):
         y = y[y.dtype.names[0]].astype(int)
-        return super().split(X, y, groups)
+        return super().split(X, y, groups, weights)
