@@ -7,9 +7,10 @@ from lifelines import CoxPHFitter
 from sklearn.base import BaseEstimator, clone, MetaEstimatorMixin
 from sklearn.utils import check_X_y
 from sklearn.utils.metaestimators import if_delegate_has_method
+from sklearn.utils.validation import check_is_fitted, check_memory
 from sksurv.linear_model import CoxPHSurvivalAnalysis
-from sklearn_extensions.feature_selection._base import ExtendedSelectorMixin
-from sklearn_extensions.utils.validation import check_is_fitted, check_memory
+from sklearn_extensions.feature_selection import ExtendedSelectorMixin
+
 from ..linear_model import FastCoxPHSurvivalAnalysis
 
 
@@ -17,8 +18,7 @@ def _get_scores(estimator, X, y, feature_idx_groups, **fit_params):
     scores = np.zeros(X.shape[1])
     if isinstance(estimator, CoxPHFitter):
         for js in feature_idx_groups:
-            scores[js[0]] = (estimator.fit(X[:, js], y, **fit_params)
-                             .log_likelihood_)
+            scores[js[0]] = estimator.fit(X[:, js], y, **fit_params).log_likelihood_
     else:
         for js in feature_idx_groups:
             Xjs = X[:, js]
@@ -26,8 +26,9 @@ def _get_scores(estimator, X, y, feature_idx_groups, **fit_params):
     return scores
 
 
-class SelectFromUnivariateSurvivalModel(ExtendedSelectorMixin,
-                                        MetaEstimatorMixin, BaseEstimator):
+class SelectFromUnivariateSurvivalModel(
+    ExtendedSelectorMixin, MetaEstimatorMixin, BaseEstimator
+):
     """Select features according to scores calculated from survival model
     fitting on each individual feature, including adjusting for any passed
     prognostic clinical or molecular features.
@@ -55,7 +56,7 @@ class SelectFromUnivariateSurvivalModel(ExtendedSelectorMixin,
         Feature scores.
     """
 
-    def __init__(self, estimator, k='all', memory=None):
+    def __init__(self, estimator, k="all", memory=None):
         self.estimator = estimator
         self.k = k
         self.memory = memory
@@ -63,7 +64,7 @@ class SelectFromUnivariateSurvivalModel(ExtendedSelectorMixin,
 
     def set_params(self, **params):
         super().set_params(**params)
-        if 'k' in params:
+        if "k" in params:
             self._penalized_k = self.k
         return self
 
@@ -103,39 +104,48 @@ class SelectFromUnivariateSurvivalModel(ExtendedSelectorMixin,
         feature_idx_groups = [[j] for j in feature_idxs]
         estimator = clone(self.estimator)
         penalty_factor = (
-            feature_meta[estimator.penalty_factor_meta_col]
-            .to_numpy(dtype=float)
-            if (feature_meta is not None
-                and hasattr(estimator, 'penalty_factor_meta_col')
-                and estimator.penalty_factor_meta_col is not None)
+            feature_meta[estimator.penalty_factor_meta_col].to_numpy(dtype=float)
+            if (
+                feature_meta is not None
+                and hasattr(estimator, "penalty_factor_meta_col")
+                and estimator.penalty_factor_meta_col is not None
+            )
             else estimator.penalty_factor
-            if (hasattr(estimator, 'penalty_factor')
-                and estimator.penalty_factor is not None)
-            else None)
+            if (
+                hasattr(estimator, "penalty_factor")
+                and estimator.penalty_factor is not None
+            )
+            else None
+        )
         if penalty_factor is not None:
-            unpenalized_feature_idxs = (np.where(penalty_factor == 0)[0]
-                                        .tolist())
+            unpenalized_feature_idxs = np.where(penalty_factor == 0)[0].tolist()
             if unpenalized_feature_idxs:
                 penalized_feature_idxs = list(
-                    set(feature_idxs) - set(unpenalized_feature_idxs))
-                feature_idx_groups = [[j] + unpenalized_feature_idxs
-                                      for j in penalized_feature_idxs]
+                    set(feature_idxs) - set(unpenalized_feature_idxs)
+                )
+                feature_idx_groups = [
+                    [j] + unpenalized_feature_idxs for j in penalized_feature_idxs
+                ]
                 self.k = self._penalized_k + len(unpenalized_feature_idxs)
         if isinstance(estimator, CoxPHFitter):
-            base_penalizer = (estimator.base_penalizer
-                              if hasattr(estimator, 'base_penalizer')
-                              else 1e-5)
+            base_penalizer = (
+                estimator.base_penalizer
+                if hasattr(estimator, "base_penalizer")
+                else 1e-5
+            )
             estimator.set_params(penalizer=base_penalizer)
         elif isinstance(estimator, CoxPHSurvivalAnalysis):
-            base_alpha = (estimator.base_alpha
-                          if hasattr(estimator, 'base_alpha') else 1e-5)
+            base_alpha = (
+                estimator.base_alpha if hasattr(estimator, "base_alpha") else 1e-5
+            )
             estimator.set_params(alpha=base_alpha)
         elif isinstance(estimator, FastCoxPHSurvivalAnalysis):
             estimator.set_params(alpha=0, penalty_factor=None)
-        if hasattr(estimator, 'penalty_factor_meta_col'):
+        if hasattr(estimator, "penalty_factor_meta_col"):
             estimator.set_params(penalty_factor_meta_col=None)
-        scores = memory.cache(_get_scores)(estimator, X, y, feature_idx_groups,
-                                           **fit_params)
+        scores = memory.cache(_get_scores)(
+            estimator, X, y, feature_idx_groups, **fit_params
+        )
         if penalty_factor is not None and unpenalized_feature_idxs:
             for j in unpenalized_feature_idxs:
                 scores[j] = 1.0
@@ -149,21 +159,26 @@ class SelectFromUnivariateSurvivalModel(ExtendedSelectorMixin,
                 alphas = alpha
             if penalty_factor is not None:
                 alphas = alphas * penalty_factor
-                base_alpha = (self.estimator_.base_alpha
-                              if hasattr(self.estimator_, 'base_alpha')
-                              else 1e-5)
+                base_alpha = (
+                    self.estimator_.base_alpha
+                    if hasattr(self.estimator_, "base_alpha")
+                    else 1e-5
+                )
                 alphas[alphas < base_alpha] = base_alpha
             self.estimator_.set_params(alpha=alphas[self.get_support()])
-        elif (isinstance(self.estimator_, FastCoxPHSurvivalAnalysis)
-              and penalty_factor is not None):
+        elif (
+            isinstance(self.estimator_, FastCoxPHSurvivalAnalysis)
+            and penalty_factor is not None
+        ):
             self.estimator_.set_params(
-                penalty_factor=penalty_factor[self.get_support()])
-        if hasattr(self.estimator_, 'penalty_factor_meta_col'):
+                penalty_factor=penalty_factor[self.get_support()]
+            )
+        if hasattr(self.estimator_, "penalty_factor_meta_col"):
             self.estimator_.set_params(penalty_factor_meta_col=None)
         self.estimator_.fit(self.transform(X), y, **fit_params)
         return self
 
-    @if_delegate_has_method(delegate='estimator')
+    @if_delegate_has_method(delegate="estimator")
     def predict(self, X, **predict_params):
         """Reduce X to the selected features and then predict using the
            underlying estimator.
@@ -184,7 +199,7 @@ class SelectFromUnivariateSurvivalModel(ExtendedSelectorMixin,
         check_is_fitted(self)
         return self.estimator_.predict(self.transform(X))
 
-    @if_delegate_has_method(delegate='estimator')
+    @if_delegate_has_method(delegate="estimator")
     def score(self, X, y, sample_weight=None):
         """Reduce X to the selected features and then return the score of the
            underlying estimator.
@@ -204,34 +219,38 @@ class SelectFromUnivariateSurvivalModel(ExtendedSelectorMixin,
         check_is_fitted(self)
         score_params = {}
         if sample_weight is not None:
-            score_params['sample_weight'] = sample_weight
+            score_params["sample_weight"] = sample_weight
         return self.estimator_.score(self.transform(X), y, **score_params)
-
 
     def _more_tags(self):
         estimator_tags = self.estimator._get_tags()
-        return {'allow_nan': estimator_tags.get('allow_nan', True)}
+        return {"allow_nan": estimator_tags.get("allow_nan", True)}
 
     def _check_params(self, X, y, feature_meta):
-        if not (self.k == 'all' or 0 <= self.k <= X.shape[1]):
-            raise ValueError("k should be >=0, <= n_features = %d; got %r. "
-                             "Use k='all' to return all features."
-                             % (X.shape[1], self.k))
-        if (hasattr(self.estimator, 'penalty_factor_meta_col')
-                and self.estimator.penalty_factor_meta_col is not None):
+        if not (self.k == "all" or 0 <= self.k <= X.shape[1]):
+            raise ValueError(
+                "k should be >=0, <= n_features = %d; got %r. "
+                "Use k='all' to return all features." % (X.shape[1], self.k)
+            )
+        if (
+            hasattr(self.estimator, "penalty_factor_meta_col")
+            and self.estimator.penalty_factor_meta_col is not None
+        ):
             if feature_meta is None:
-                raise ValueError('penalty_factor_meta_col specified but '
-                                 'feature_meta not passed.')
-            if (self.estimator.penalty_factor_meta_col not in
-                    feature_meta.columns):
-                raise ValueError('%s feature_meta column does not exist.'
-                                 % self.estimator.penalty_factor_meta_col)
+                raise ValueError(
+                    "penalty_factor_meta_col specified but " "feature_meta not passed."
+                )
+            if self.estimator.penalty_factor_meta_col not in feature_meta.columns:
+                raise ValueError(
+                    "%s feature_meta column does not exist."
+                    % self.estimator.penalty_factor_meta_col
+                )
 
     def _get_support_mask(self):
         check_is_fitted(self)
-        if self.k == 'all':
+        if self.k == "all":
             return np.ones_like(self.scores_, dtype=bool)
         mask = np.zeros_like(self.scores_, dtype=bool)
         if self.k > 0:
-            mask[np.argsort(self.scores_, kind='mergesort')[-self.k:]] = True
+            mask[np.argsort(self.scores_, kind="mergesort")[-self.k :]] = True
         return mask

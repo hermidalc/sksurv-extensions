@@ -6,7 +6,7 @@ from sklearn.utils.metaestimators import if_delegate_has_method
 from sklearn_extensions.pipeline import ExtendedPipeline
 
 
-@if_delegate_has_method(delegate='_final_estimator')
+@if_delegate_has_method(delegate="_final_estimator")
 def predict_cumulative_hazard_function(self, X, **predict_params):
     """Predict cumulative hazard function.
 
@@ -30,13 +30,11 @@ def predict_cumulative_hazard_function(self, X, **predict_params):
     cum_hazard : ndarray, shape = (n_samples,)
         Predicted cumulative hazard functions.
     """
-    Xt, predict_params = self._transform_pipeline('predict',
-                                                  X, predict_params)
-    return self.steps[-1][-1].predict_cumulative_hazard_function(
-        Xt, **predict_params)
+    Xt, predict_params = self._transform_pipeline("predict", X, predict_params)
+    return self.steps[-1][-1].predict_cumulative_hazard_function(Xt, **predict_params)
 
 
-@if_delegate_has_method(delegate='_final_estimator')
+@if_delegate_has_method(delegate="_final_estimator")
 def predict_survival_function(self, X, **predict_params):
     """Predict survival function.
 
@@ -60,12 +58,9 @@ def predict_survival_function(self, X, **predict_params):
     survival : ndarray, shape = (n_samples,)
         Predicted survival functions.
     """
-    Xt, predict_params = self._transform_pipeline('predict',
-                                                  X, predict_params)
+    Xt, predict_params = self._transform_pipeline("predict", X, predict_params)
     return self.steps[-1][-1].predict_survival_function(Xt, **predict_params)
 
 
-ExtendedPipeline.predict_cumulative_hazard_function = (
-    predict_cumulative_hazard_function)
-ExtendedPipeline.predict_survival_function = (
-    predict_survival_function)
+ExtendedPipeline.predict_cumulative_hazard_function = predict_cumulative_hazard_function
+ExtendedPipeline.predict_survival_function = predict_survival_function

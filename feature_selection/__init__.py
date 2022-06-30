@@ -6,4 +6,4 @@ algorithms.
 from ._univariate_model import SelectFromUnivariateSurvivalModel
 
 
-__all__ = ['SelectFromUnivariateSurvivalModel']
+__all__ = ["SelectFromUnivariateSurvivalModel"]

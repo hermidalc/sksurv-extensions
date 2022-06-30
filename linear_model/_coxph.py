@@ -8,7 +8,7 @@ from sksurv.linear_model import CoxPHSurvivalAnalysis
 
 
 class ExtendedCoxPHSurvivalAnalysis(CoxPHSurvivalAnalysis):
-    """Extended Cox proportional hazards model.
+    """Cox proportional hazards model.
 
     There are two possible choices for handling tied event times.
     The default is Breslow's method, which considers each of the
@@ -28,16 +28,15 @@ class ExtendedCoxPHSurvivalAnalysis(CoxPHSurvivalAnalysis):
         If you want to include a subset of features without penalization,
         set the corresponding entries to 0.
 
-    ties : "breslow" | "efron", optional, default: "efron"
+    ties : "breslow" | "efron", optional, default: "breslow"
         The method to handle tied event times. If there are
         no tied event times all the methods are equivalent.
 
-    n_iter : int, optional, default: 1000
+    n_iter : int, optional, default: 100
         Maximum number of iterations.
 
     tol : float, optional, default: 1e-9
-        Convergence criteria. Convergence is based on the negative \
-        log-likelihood::
+        Convergence criteria. Convergence is based on the negative log-likelihood::
 
         |1 - (new neg. log-likelihood / old neg. log-likelihood) | < tol
 
@@ -64,22 +63,41 @@ class ExtendedCoxPHSurvivalAnalysis(CoxPHSurvivalAnalysis):
     baseline_survival_ : :class:`sksurv.functions.StepFunction`
         Estimated baseline survival function.
 
+    n_features_in_ : int
+        Number of features seen during ``fit``.
+
+    feature_names_in_ : ndarray of shape (`n_features_in_`,)
+        Names of features seen during ``fit``. Defined only when `X`
+        has feature names that are all strings.
+
+    See also
+    --------
+    sksurv.linear_model.CoxnetSurvivalAnalysis
+        Cox proportional hazards model with l1 (LASSO) and l2 (ridge) penalty.
+
     References
     ----------
     .. [1] Cox, D. R. Regression models and life tables (with discussion).
-           Journal of the Royal Statistical Society. Series B, 34, 187-220, \
-           1972.
+           Journal of the Royal Statistical Society. Series B, 34, 187-220, 1972.
     .. [2] Breslow, N. E. Covariance Analysis of Censored Survival Data.
            Biometrics 30 (1974): 89–99.
-    .. [3] Efron, B. The Efficiency of Cox’s Likelihood Function for Censored \
-           Data.
+    .. [3] Efron, B. The Efficiency of Cox’s Likelihood Function for Censored Data.
            Journal of the American Statistical Association 72 (1977): 557–565.
     """
 
-    def __init__(self, alpha=0, ties='efron', n_iter=1000, tol=1e-9,
-                 verbose=0, base_alpha=1e-5, penalty_factor_meta_col=None):
-        super().__init__(alpha=alpha, ties=ties, n_iter=n_iter, tol=tol,
-                         verbose=verbose)
+    def __init__(
+        self,
+        alpha=0,
+        ties="efron",
+        n_iter=1000,
+        tol=1e-9,
+        verbose=0,
+        base_alpha=1e-5,
+        penalty_factor_meta_col=None,
+    ):
+        super().__init__(
+            alpha=alpha, ties=ties, n_iter=n_iter, tol=tol, verbose=verbose
+        )
         self.base_alpha = base_alpha
         self.penalty_factor_meta_col = penalty_factor_meta_col
 
@@ -106,16 +124,21 @@ class ExtendedCoxPHSurvivalAnalysis(CoxPHSurvivalAnalysis):
         """
         X, y = check_X_y(X, y)
         self.__check_params(X, y, feature_meta)
-        if (isinstance(self.alpha, (numbers.Real, numbers.Integral))
-                and self.penalty_factor_meta_col is not None):
+        if (
+            isinstance(self.alpha, (numbers.Real, numbers.Integral))
+            and self.penalty_factor_meta_col is not None
+        ):
             alphas = np.full(X.shape[1], self.alpha, dtype=float)
-            penalty_factor = (feature_meta[self.penalty_factor_meta_col]
-                              .to_numpy(dtype=float))
+            penalty_factor = feature_meta[self.penalty_factor_meta_col].to_numpy(
+                dtype=float
+            )
             if alphas.shape[0] != penalty_factor.shape[0]:
-                raise ValueError('Length of alphas ({}) must match length of '
-                                 'penalty_factor_meta_col ({}).'
-                                 .format(alphas.shape[0],
-                                         penalty_factor.shape[0]))
+                raise ValueError(
+                    "Length of alphas ({}) must match length of "
+                    "penalty_factor_meta_col ({}).".format(
+                        alphas.shape[0], penalty_factor.shape[0]
+                    )
+                )
             alphas = alphas * penalty_factor
             alphas[alphas < self.base_alpha] = self.base_alpha
             self.alpha = alphas
@@ -142,12 +165,18 @@ class ExtendedCoxPHSurvivalAnalysis(CoxPHSurvivalAnalysis):
     def __check_params(self, X, y, feature_meta):
         if self.penalty_factor_meta_col is not None:
             if feature_meta is None:
-                raise ValueError('penalty_factor_meta_col specified but '
-                                 'feature_meta not passed.')
+                raise ValueError(
+                    "penalty_factor_meta_col specified but " "feature_meta not passed."
+                )
             if self.penalty_factor_meta_col not in feature_meta.columns:
-                raise ValueError('%s feature_meta column does not exist.'
-                                 % self.penalty_factor_meta_col)
+                raise ValueError(
+                    "%s feature_meta column does not exist."
+                    % self.penalty_factor_meta_col
+                )
             if X.shape[1] != feature_meta.shape[0]:
-                raise ValueError('X ({:d}) and feature_meta ({:d}) have '
-                                 'different feature dimensions'
-                                 .format(X.shape[1], feature_meta.shape[0]))
+                raise ValueError(
+                    "X ({:d}) and feature_meta ({:d}) have "
+                    "different feature dimensions".format(
+                        X.shape[1], feature_meta.shape[0]
+                    )
+                )
