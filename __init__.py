@@ -2,11 +2,13 @@
 sksurv_extensions is a library of custom extensions and changes to sksurv
 """
 
-from sklearn.utils.metaestimators import if_delegate_has_method
-from sklearn_extensions.pipeline import ExtendedPipeline
+from pkg_resources import DistributionNotFound, get_distribution
+
+from sklearn.utils.metaestimators import available_if
+from sklearn_extensions.pipeline import ExtendedPipeline, _final_estimator_has
 
 
-@if_delegate_has_method(delegate="_final_estimator")
+@available_if(_final_estimator_has("predict_cumulative_hazard_function"))
 def predict_cumulative_hazard_function(self, X, **predict_params):
     """Predict cumulative hazard function.
 
@@ -34,7 +36,7 @@ def predict_cumulative_hazard_function(self, X, **predict_params):
     return self.steps[-1][-1].predict_cumulative_hazard_function(Xt, **predict_params)
 
 
-@if_delegate_has_method(delegate="_final_estimator")
+@available_if(_final_estimator_has("predict_survival_function"))
 def predict_survival_function(self, X, **predict_params):
     """Predict survival function.
 
@@ -62,5 +64,17 @@ def predict_survival_function(self, X, **predict_params):
     return self.steps[-1][-1].predict_survival_function(Xt, **predict_params)
 
 
-ExtendedPipeline.predict_cumulative_hazard_function = predict_cumulative_hazard_function
-ExtendedPipeline.predict_survival_function = predict_survival_function
+def patch_pipeline():
+    ExtendedPipeline.predict_cumulative_hazard_function = (
+        predict_cumulative_hazard_function
+    )
+    ExtendedPipeline.predict_survival_function = predict_survival_function
+
+
+try:
+    __version__ = get_distribution("scikit-survival").version
+except DistributionNotFound:  # pragma: no cover
+    # package is not installed
+    __version__ = "unknown"
+
+patch_pipeline()

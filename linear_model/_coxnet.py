@@ -107,6 +107,9 @@ class ExtendedCoxnetSurvivalAnalysis(CoxnetSurvivalAnalysis):
         Names of features seen during ``fit``. Defined only when `X`
         has feature names that are all strings.
 
+    event_times_ : array of shape = (n_event_times,)
+        Unique time points where events occurred.
+
     References
     ----------
     .. [1] Simon N, Friedman J, Hastie T, Tibshirani R.
