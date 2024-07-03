@@ -396,14 +396,20 @@ class MetaCoxnetSurvivalAnalysis(MetaEstimatorMixin, BaseEstimator):
         return self.estimator_.predict(X, alpha=self.alpha)
 
     @if_delegate_has_method(delegate="estimator")
-    def predict_cumulative_hazard_function(self, X, **predict_params):
+    def predict_cumulative_hazard_function(
+        self, X, return_array=False, **predict_params
+    ):
         check_is_fitted(self)
-        return self.estimator_.predict_cumulative_hazard_function(X, alpha=self.alpha)
+        return self.estimator_.predict_cumulative_hazard_function(
+            X, alpha=self.alpha, return_array=return_array
+        )
 
     @if_delegate_has_method(delegate="estimator")
-    def predict_survival_function(self, X, **predict_params):
+    def predict_survival_function(self, X, return_array=False, **predict_params):
         check_is_fitted(self)
-        return self.estimator_.predict_survival_function(X, alpha=self.alpha)
+        return self.estimator_.predict_survival_function(
+            X, alpha=self.alpha, return_array=return_array
+        )
 
     @if_delegate_has_method(delegate="estimator")
     def score(self, X, y, sample_weight=None):
