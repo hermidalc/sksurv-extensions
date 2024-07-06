@@ -372,6 +372,10 @@ class FastCoxPHSurvivalAnalysis(ExtendedCoxnetSurvivalAnalysis):
         self.alphas = [self.alpha / X.shape[0]]
         return super().fit(X, y, feature_meta)
 
+    def _get_coef(self, alpha):
+        coef = super().fit(alpha)
+        return coef[0] if isinstance(coef, (tuple, list)) else coef
+
 
 class MetaCoxnetSurvivalAnalysis(MetaEstimatorMixin, BaseEstimator):
     def __init__(self, estimator, alpha=None):
