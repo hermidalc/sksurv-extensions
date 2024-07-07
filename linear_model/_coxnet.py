@@ -384,7 +384,8 @@ class MetaCoxnetSurvivalAnalysis(MetaEstimatorMixin, BaseEstimator):
     @property
     def coef_(self):
         check_is_fitted(self)
-        return self.estimator_._get_coef(self.alpha)
+        coef = self.estimator_._get_coef(self.alpha)
+        return coef[0] if isinstance(coef, (tuple, list)) else coef
 
     def fit(self, X, y, **fit_params):
         X, y = self._validate_data(X, y, dtype=None)
