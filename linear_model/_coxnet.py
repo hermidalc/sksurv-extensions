@@ -1,7 +1,6 @@
 """Coxnet extensions."""
 
 from sklearn.base import BaseEstimator, clone, MetaEstimatorMixin
-from sklearn.utils import check_X_y
 from sklearn.utils.metaestimators import if_delegate_has_method
 from sklearn.utils.validation import check_is_fitted
 from sksurv.linear_model import CoxnetSurvivalAnalysis
@@ -168,7 +167,7 @@ class ExtendedCoxnetSurvivalAnalysis(CoxnetSurvivalAnalysis):
         -------
         self : object
         """
-        X, y = check_X_y(X, y)
+        X, y = self._validate_data(X, y)
         self.__check_params(X, y, feature_meta)
         if self.penalty_factor is None and self.penalty_factor_meta_col is not None:
             self.penalty_factor = feature_meta[self.penalty_factor_meta_col].to_numpy(
@@ -388,7 +387,7 @@ class MetaCoxnetSurvivalAnalysis(MetaEstimatorMixin, BaseEstimator):
         return self.estimator_._get_coef(self.alpha)
 
     def fit(self, X, y, **fit_params):
-        X, y = check_X_y(X, y, dtype=None)
+        X, y = self._validate_data(X, y, dtype=None)
         self._check_params(X, y)
         self.estimator_ = clone(self.estimator)
         self.estimator_.fit(X, y, **fit_params)

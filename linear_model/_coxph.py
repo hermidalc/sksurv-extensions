@@ -3,7 +3,6 @@
 import numbers
 import numpy as np
 
-from sklearn.utils import check_X_y
 from sksurv.linear_model import CoxPHSurvivalAnalysis
 
 
@@ -122,7 +121,7 @@ class ExtendedCoxPHSurvivalAnalysis(CoxPHSurvivalAnalysis):
         -------
         self : object
         """
-        X, y = check_X_y(X, y)
+        X, y = self._validate_data(X, y)
         self.__check_params(X, y, feature_meta)
         if (
             isinstance(self.alpha, (numbers.Real, numbers.Integral))

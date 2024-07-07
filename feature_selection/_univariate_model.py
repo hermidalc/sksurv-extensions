@@ -5,7 +5,6 @@ import numpy as np
 
 from lifelines import CoxPHFitter
 from sklearn.base import BaseEstimator, clone, MetaEstimatorMixin
-from sklearn.utils import check_X_y
 from sklearn.utils.metaestimators import if_delegate_has_method
 from sklearn.utils.validation import check_is_fitted, check_memory
 from sksurv.linear_model import CoxPHSurvivalAnalysis
@@ -97,7 +96,7 @@ class SelectFromUnivariateSurvivalModel(
         -------
         self : object
         """
-        X, y = check_X_y(X, y)
+        X, y = self._validate_data(X, y)
         self._check_params(X, y, feature_meta)
         memory = check_memory(self.memory)
         feature_idxs = range(X.shape[1])
@@ -110,12 +109,14 @@ class SelectFromUnivariateSurvivalModel(
                 and hasattr(estimator, "penalty_factor_meta_col")
                 and estimator.penalty_factor_meta_col is not None
             )
-            else estimator.penalty_factor
-            if (
-                hasattr(estimator, "penalty_factor")
-                and estimator.penalty_factor is not None
+            else (
+                estimator.penalty_factor
+                if (
+                    hasattr(estimator, "penalty_factor")
+                    and estimator.penalty_factor is not None
+                )
+                else None
             )
-            else None
         )
         if penalty_factor is not None:
             unpenalized_feature_idxs = np.where(penalty_factor == 0)[0].tolist()
