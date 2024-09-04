@@ -5,7 +5,7 @@ import numpy as np
 
 from lifelines import CoxPHFitter
 from sklearn.base import BaseEstimator, clone, MetaEstimatorMixin
-from sklearn.utils.metaestimators import if_delegate_has_method
+from sklearn.utils.metaestimators import available_if
 from sklearn.utils.validation import check_is_fitted, check_memory
 from sksurv.linear_model import CoxPHSurvivalAnalysis
 from sklearn_extensions.feature_selection import ExtendedSelectorMixin
@@ -23,6 +23,23 @@ def _get_scores(estimator, X, y, feature_idx_groups, **fit_params):
             Xjs = X[:, js]
             scores[js[0]] = estimator.fit(Xjs, y, **fit_params).score(Xjs, y)
     return scores
+
+
+def _estimator_has(attr):
+    """Check if we can delegate a method to the underlying estimator.
+
+    First, we check the fitted estimator if available, otherwise we
+    check the unfitted estimator.
+    """
+
+    def check(self):
+        if hasattr(self, "estimator_"):
+            getattr(self.estimator_, attr)
+        else:
+            getattr(self.estimator, attr)
+        return True
+
+    return check
 
 
 class SelectFromUnivariateSurvivalModel(
@@ -179,7 +196,7 @@ class SelectFromUnivariateSurvivalModel(
         self.estimator_.fit(self.transform(X), y, **fit_params)
         return self
 
-    @if_delegate_has_method(delegate="estimator")
+    @available_if(_estimator_has("predict"))
     def predict(self, X, **predict_params):
         """Reduce X to the selected features and then predict using the
            underlying estimator.
@@ -200,7 +217,7 @@ class SelectFromUnivariateSurvivalModel(
         check_is_fitted(self)
         return self.estimator_.predict(self.transform(X))
 
-    @if_delegate_has_method(delegate="estimator")
+    @available_if(_estimator_has("score"))
     def score(self, X, y, sample_weight=None):
         """Reduce X to the selected features and then return the score of the
            underlying estimator.

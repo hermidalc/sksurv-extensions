@@ -1,7 +1,7 @@
 """Coxnet extensions."""
 
 from sklearn.base import BaseEstimator, clone, MetaEstimatorMixin
-from sklearn.utils.metaestimators import if_delegate_has_method
+from sklearn.utils.metaestimators import available_if
 from sklearn.utils.validation import check_is_fitted
 from sksurv.linear_model import CoxnetSurvivalAnalysis
 from sksurv.metrics import concordance_index_censored
@@ -376,6 +376,23 @@ class FastCoxPHSurvivalAnalysis(ExtendedCoxnetSurvivalAnalysis):
         return coef[0] if isinstance(coef, (tuple, list)) else coef
 
 
+def _estimator_has(attr):
+    """Check if we can delegate a method to the underlying estimator.
+
+    First, we check the fitted estimator if available, otherwise we
+    check the unfitted estimator.
+    """
+
+    def check(self):
+        if hasattr(self, "estimator_"):
+            getattr(self.estimator_, attr)
+        else:
+            getattr(self.estimator, attr)
+        return True
+
+    return check
+
+
 class MetaCoxnetSurvivalAnalysis(MetaEstimatorMixin, BaseEstimator):
     def __init__(self, estimator, alpha=None):
         self.estimator = estimator
@@ -394,12 +411,12 @@ class MetaCoxnetSurvivalAnalysis(MetaEstimatorMixin, BaseEstimator):
         self.estimator_.fit(X, y, **fit_params)
         return self
 
-    @if_delegate_has_method(delegate="estimator")
+    @available_if(_estimator_has("predict"))
     def predict(self, X, **predict_params):
         check_is_fitted(self)
         return self.estimator_.predict(X, alpha=self.alpha)
 
-    @if_delegate_has_method(delegate="estimator")
+    @available_if(_estimator_has("predict_cumulative_hazard_function"))
     def predict_cumulative_hazard_function(
         self, X, return_array=False, **predict_params
     ):
@@ -408,14 +425,14 @@ class MetaCoxnetSurvivalAnalysis(MetaEstimatorMixin, BaseEstimator):
             X, alpha=self.alpha, return_array=return_array
         )
 
-    @if_delegate_has_method(delegate="estimator")
+    @available_if(_estimator_has("predict_survival_function"))
     def predict_survival_function(self, X, return_array=False, **predict_params):
         check_is_fitted(self)
         return self.estimator_.predict_survival_function(
             X, alpha=self.alpha, return_array=return_array
         )
 
-    @if_delegate_has_method(delegate="estimator")
+    @available_if(_estimator_has("score"))
     def score(self, X, y, sample_weight=None):
         check_is_fitted(self)
         score_params = {}
